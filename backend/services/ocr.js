@@ -1,7 +1,20 @@
 const Tesseract = require('tesseract.js');
-const pdfParse = require('pdf-parse');
+const sharp = require('sharp');
 const fs = require('fs');
+const path = require('path');
 const logger = require('../utils/logger');
+
+// Import pdf-parse - handle both CommonJS and ES module exports
+let pdfParse;
+try {
+  pdfParse = require('pdf-parse');
+  // Handle if it's exported as { default: function }
+  if (pdfParse.default) {
+    pdfParse = pdfParse.default;
+  }
+} catch (error) {
+  logger.error('Failed to load pdf-parse', error);
+}
 
 class OCRService {
   constructor() {
@@ -9,9 +22,6 @@ class OCRService {
     this.isInitialized = false;
   }
 
-  /**
-   * Initialize Tesseract worker
-   */
   async initialize() {
     if (this.isInitialized) {
       return;
@@ -20,29 +30,48 @@ class OCRService {
     try {
       logger.info('Initializing Tesseract OCR worker...');
       
-      this.worker = await Tesseract.createWorker(
-        process.env.OCR_LANGUAGE || 'eng',
-        1,
-        {
-          logger: (m) => {
-            if (process.env.ENABLE_DEBUG === 'true') {
-              logger.debug(`Tesseract: ${m.status} ${m.progress ? (m.progress * 100).toFixed(0) + '%' : ''}`);
-            }
+      this.worker = await Tesseract.createWorker('eng', 1, {
+        logger: (m) => {
+          if (process.env.ENABLE_DEBUG === 'true') {
+            logger.debug(`Tesseract: ${m.status} ${m.progress ? (m.progress * 100).toFixed(0) + '%' : ''}`);
           }
         }
-      );
+      });
       
       this.isInitialized = true;
-      logger.success('Tesseract OCR worker initialized');
+      logger.success('Tesseract OCR worker initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize Tesseract worker', error);
       throw error;
     }
   }
 
-  /**
-   * Extract text from plain text file
-   */
+  async preprocessImage(filepath) {
+    try {
+      logger.info(`Preprocessing image: ${filepath}`);
+      
+      const processedPath = filepath.replace(/\.(jpg|jpeg|png)$/i, '_processed.png');
+      
+      await sharp(filepath)
+        .resize(3000, 3000, {
+          fit: 'inside',
+          withoutEnlargement: false
+        })
+        .grayscale()
+        .normalize()
+        .sharpen()
+        .threshold(128)
+        .toFormat('png')
+        .toFile(processedPath);
+      
+      logger.success('Image preprocessed successfully');
+      return processedPath;
+    } catch (error) {
+      logger.error('Image preprocessing failed, using original', error);
+      return filepath;
+    }
+  }
+
   async extractFromTextFile(filepath) {
     try {
       logger.info(`Reading plain text file: ${filepath}`);
@@ -64,46 +93,48 @@ class OCRService {
     }
   }
 
-  /**
-   * Extract text from PDF using native parser
-   */
   async extractFromPDF(filepath) {
     try {
       logger.info(`Attempting native PDF text extraction: ${filepath}`);
       
-      const dataBuffer = fs.readFileSync(filepath);
-      const data = await pdfParse(dataBuffer);
+      // Check if pdfParse is available
+      if (!pdfParse || typeof pdfParse !== 'function') {
+        throw new Error('pdf-parse library not properly loaded');
+      }
       
-      // Check if we got meaningful text (at least 20 characters)
-      if (data.text && data.text.trim().length > 20) {
-        logger.success(`Native PDF extraction successful: ${data.text.length} characters`);
+      const dataBuffer = fs.readFileSync(filepath);
+      
+      // Call pdf-parse
+      const data = await pdfParse(dataBuffer, {
+        max: 0  // Parse all pages
+      });
+      
+      if (data && data.text && data.text.trim().length > 50) {
+        logger.success(`PDF extraction: ${data.text.length} chars from ${data.numpages} pages`);
         return {
           text: data.text.trim(),
-          method: 'native',
+          method: 'native-pdf',
           pages: data.numpages,
           confidence: 100
         };
       } else {
-        logger.info('Native PDF extraction yielded insufficient text');
-        
-        // For demo purposes, return a message instead of failing
+        logger.warn('PDF has minimal extractable text');
         return {
-          text: `[PDF Document - ${data.numpages || 'Unknown'} pages]\n\nNote: This PDF appears to be image-based or scanned. Full OCR support for scanned PDFs will be added in Phase 2 with advanced document processing capabilities.`,
+          text: data?.text?.trim() || '[Empty PDF]',
           method: 'pdf-metadata',
-          pages: data.numpages,
-          confidence: 50
+          pages: data?.numpages || 0,
+          confidence: 30
         };
       }
     } catch (error) {
-      logger.error('Native PDF extraction failed', error);
-      throw new Error('PDF processing failed. The file may be corrupted or password-protected.');
+      logger.error('PDF extraction failed', error);
+      throw new Error(`PDF processing failed: ${error.message}`);
     }
   }
 
-  /**
-   * Extract text from image using OCR
-   */
   async extractFromImage(filepath) {
+    let processedPath = null;
+    
     try {
       logger.info(`Starting OCR extraction: ${filepath}`);
       
@@ -111,44 +142,56 @@ class OCRService {
         await this.initialize();
       }
 
-      const { data: { text, confidence } } = await this.worker.recognize(filepath);
+      processedPath = await this.preprocessImage(filepath);
       
-      logger.success(`OCR extraction completed: ${text.length} characters, ${confidence.toFixed(2)}% confidence`);
+      logger.info('Running Tesseract OCR...');
+      const { data } = await this.worker.recognize(processedPath);
+      
+      const text = data.text.trim();
+      const confidence = data.confidence || 0;
+      
+      if (text.length < 10) {
+        throw new Error('OCR extracted very little text');
+      }
+      
+      logger.success(`OCR: ${text.length} chars, ${confidence.toFixed(1)}% confidence`);
+      
+      if (processedPath && processedPath !== filepath && fs.existsSync(processedPath)) {
+        fs.unlinkSync(processedPath);
+      }
       
       return {
-        text: text.trim(),
+        text: text,
         method: 'ocr',
         confidence: confidence
       };
     } catch (error) {
       logger.error('OCR extraction failed', error);
-      throw error;
+      
+      if (processedPath && processedPath !== filepath && fs.existsSync(processedPath)) {
+        try { fs.unlinkSync(processedPath); } catch (e) {}
+      }
+      
+      throw new Error(`OCR failed: ${error.message}`);
     }
   }
 
-  /**
-   * Extract text from any supported file type
-   */
   async extractText(filepath, mimeType) {
     try {
-      logger.info(`Processing file: ${filepath} (${mimeType})`);
+      logger.info(`Processing: ${filepath} (${mimeType})`);
 
-      // Handle plain text files directly
       if (mimeType === 'text/plain') {
         return await this.extractFromTextFile(filepath);
       }
 
-      // Handle PDF files (native extraction only for now)
       if (mimeType === 'application/pdf') {
         return await this.extractFromPDF(filepath);
       }
 
-      // Handle image files with OCR
       if (mimeType.startsWith('image/')) {
         return await this.extractFromImage(filepath);
       }
 
-      // Unsupported file type
       throw new Error(`Unsupported file type: ${mimeType}`);
 
     } catch (error) {
@@ -157,9 +200,6 @@ class OCRService {
     }
   }
 
-  /**
-   * Cleanup resources
-   */
   async terminate() {
     if (this.worker) {
       logger.info('Terminating Tesseract worker...');
@@ -171,5 +211,4 @@ class OCRService {
   }
 }
 
-// Export singleton instance
 module.exports = new OCRService();

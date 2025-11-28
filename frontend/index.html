@@ -1,253 +1,269 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAG Document Intelligence System</title>
+    <title>RAG Intelligence | Advanced</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        * {
-            font-family: 'Inter', sans-serif;
-        }
-        
-        .gradient-bg {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        
-        .card {
-            backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-        }
-        
-        .upload-zone {
-            border: 2px dashed #cbd5e0;
-            transition: all 0.3s ease;
-        }
-        
-        .upload-zone.dragover {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.05);
-        }
-        
-        .pulse-dot {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
-        }
-        
-        .chat-message {
-            animation: slideIn 0.3s ease;
-        }
-        
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        black: '#000000',
+                        white: '#ffffff',
+                        gray: {
+                            50: '#f9fafb',
+                            100: '#f3f4f6',
+                            200: '#e5e7eb',
+                            300: '#d1d5db',
+                            400: '#9ca3af',
+                            500: '#6b7280',
+                            600: '#4b5563',
+                            700: '#374151',
+                            800: '#1f2937',
+                            900: '#111827',
+                            950: '#030712',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
             }
         }
-        
-        .loading-dots span {
-            animation: blink 1.4s infinite both;
-        }
-        
-        .loading-dots span:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-        
-        .loading-dots span:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-        
-        @keyframes blink {
-            0%, 80%, 100% { opacity: 0; }
-            40% { opacity: 1; }
-        }
-    </style>
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-50">
-    <!-- Navigation -->
-    <nav class="gradient-bg text-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <svg class="w-8 h-8 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                    <span class="text-xl font-bold">RAG Intelligence</span>
-                </div>
-                <div class="flex gap-4">
-                    <button onclick="switchTab('upload')" id="tab-upload" class="px-4 py-2 rounded-lg hover:bg-white/20 transition">
-                        📤 Upload
-                    </button>
-                    <button onclick="switchTab('documents')" id="tab-documents" class="px-4 py-2 rounded-lg hover:bg-white/20 transition">
-                        📁 Documents
-                    </button>
-                    <button onclick="switchTab('query')" id="tab-query" class="px-4 py-2 rounded-lg hover:bg-white/20 transition">
-                        💬 Ask AI
-                    </button>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<body class="bg-black text-white font-sans selection:bg-white selection:text-black antialiased">
+    
+    <!-- Main Container -->
+    <div class="flex flex-col h-screen max-h-screen overflow-hidden">
         
-        <!-- Upload Tab -->
-        <div id="content-upload" class="tab-content">
-            <div class="card rounded-2xl p-8 mb-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">📤 Upload Documents</h2>
-                <p class="text-gray-600 mb-6">Upload PDF, images, or text files for AI-powered analysis</p>
-                
-                <div id="dropZone" class="upload-zone rounded-xl p-12 text-center cursor-pointer mb-6">
-                    <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                    </svg>
-                    <p class="text-lg font-semibold text-gray-700 mb-2">Drag & drop files here</p>
-                    <p class="text-sm text-gray-500 mb-4">or click to browse</p>
-                    <input type="file" id="fileInput" class="hidden" multiple accept=".pdf,.txt,.jpg,.jpeg,.png">
-                    <button onclick="document.getElementById('fileInput').click()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
-                        Choose Files
-                    </button>
+        <!-- Header -->
+        <header class="flex-shrink-0 border-b border-gray-900 bg-black/80 backdrop-blur-xl sticky top-0 z-50">
+            <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                        <svg class="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <h1 class="text-xl font-bold tracking-tight">RAG Intelligence</h1>
                 </div>
+                
+                <nav class="flex bg-gray-900/50 rounded-full p-1 border border-gray-800">
+                    <button onclick="switchTab('upload')" id="tab-upload" class="nav-item active">Upload</button>
+                    <button onclick="switchTab('documents')" id="tab-documents" class="nav-item">Documents</button>
+                    <button onclick="switchTab('query')" id="tab-query" class="nav-item">Ask AI</button>
+                </nav>
+            </div>
+        </header>
 
-                <div id="uploadStatus" class="hidden mb-4">
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div class="flex items-center">
-                            <div class="pulse-dot w-3 h-3 bg-blue-600 rounded-full mr-3"></div>
-                            <span class="text-blue-800" id="uploadStatusText">Processing...</span>
+        <!-- Main Content -->
+        <main class="flex-1 overflow-hidden relative">
+            
+            <!-- Upload Section -->
+            <section id="content-upload" class="tab-content h-full overflow-y-auto">
+                <div class="max-w-4xl mx-auto px-6 py-12">
+                    <div class="text-center mb-12">
+                        <h2 class="text-4xl font-bold mb-4">Ingest Knowledge</h2>
+                        <p class="text-gray-400 text-lg">Upload documents to build your intelligence base.</p>
+                    </div>
+
+                    <div class="bg-gray-900/30 border border-gray-800 rounded-2xl p-12 mb-8 transition-all hover:border-gray-600 group relative overflow-hidden">
+                        <div class="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                        
+                        <div id="dropZone" class="text-center cursor-pointer relative z-10">
+                            <div class="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-xl font-semibold mb-2 text-white">Drag & Drop files here</h3>
+                            <p class="text-gray-500 text-sm mb-6">PDF, TXT, PNG, JPG (Max 50MB)</p>
+                            <button onclick="document.getElementById('fileInput').click()" class="btn-primary">
+                                Select Files
+                            </button>
+                            <input type="file" id="fileInput" class="hidden" multiple accept=".pdf,.txt,.jpg,.jpeg,.png">
+                        </div>
+                    </div>
+
+                    <div id="uploadStatus" class="hidden mb-8">
+                        <div class="flex items-center justify-between p-4 bg-gray-900 border border-gray-800 rounded-xl">
+                            <div class="flex items-center gap-3">
+                                <div class="loader"></div>
+                                <span id="uploadStatusText" class="text-sm text-gray-300">Processing...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-6 mb-8" id="stats"></div>
+                    <div id="uploadedFiles" class="space-y-3"></div>
+                </div>
+            </section>
+
+            <!-- Documents Section -->
+            <section id="content-documents" class="tab-content hidden h-full overflow-y-auto">
+                <div class="max-w-4xl mx-auto px-6 py-12">
+                    <div class="flex justify-between items-center mb-8">
+                        <h2 class="text-3xl font-bold">Library</h2>
+                        <button onclick="loadDocuments()" class="p-2 hover:bg-gray-800 rounded-lg transition text-gray-400 hover:text-white">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="documentsList" class="space-y-4"></div>
+                </div>
+            </section>
+
+            <!-- Query Section - Redesigned -->
+            <section id="content-query" class="tab-content hidden h-full flex flex-col bg-gradient-to-b from-black to-gray-950">
+                
+                <!-- Messages Container -->
+                <div class="flex-1 overflow-y-auto" id="chatScrollContainer">
+                    <div class="max-w-4xl mx-auto px-6 py-8" id="chatContainer">
+                        <!-- Empty State -->
+                        <div class="flex flex-col items-center justify-center min-h-[calc(100vh-300px)] text-center">
+                            <div class="w-20 h-20 bg-gradient-to-br from-gray-800 to-gray-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl">
+                                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-3 text-white">Start a conversation</h3>
+                            <p class="text-gray-500 max-w-md mb-8 leading-relaxed">Ask anything about your documents. I'll provide detailed answers with source citations.</p>
+                            
+                            <!-- Suggestion Cards -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl w-full">
+                                <button onclick="quickQuery('Summarize the main points from all documents')" class="suggestion-card group">
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-700 transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                        </div>
+                                        <div class="text-left flex-1">
+                                            <p class="font-medium text-sm text-white mb-1">Summarize documents</p>
+                                            <p class="text-xs text-gray-500">Get a concise overview of key points</p>
+                                        </div>
+                                    </div>
+                                </button>
+                                
+                                <button onclick="quickQuery('Extract all dates, numbers, and important figures')" class="suggestion-card group">
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-700 transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+                                        </div>
+                                        <div class="text-left flex-1">
+                                            <p class="font-medium text-sm text-white mb-1">Extract data</p>
+                                            <p class="text-xs text-gray-500">Pull out numbers, dates, and metrics</p>
+                                        </div>
+                                    </div>
+                                </button>
+                                
+                                <button onclick="quickQuery('What are the main topics and themes?')" class="suggestion-card group">
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-700 transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+                                        </div>
+                                        <div class="text-left flex-1">
+                                            <p class="font-medium text-sm text-white mb-1">Identify themes</p>
+                                            <p class="text-xs text-gray-500">Find recurring topics and patterns</p>
+                                        </div>
+                                    </div>
+                                </button>
+                                
+                                <button onclick="quickQuery('Compare and contrast the documents')" class="suggestion-card group">
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center flex-shrink-0 group-hover:bg-gray-700 transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                        </div>
+                                        <div class="text-left flex-1">
+                                            <p class="font-medium text-sm text-white mb-1">Compare documents</p>
+                                            <p class="text-xs text-gray-500">Analyze similarities and differences</p>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div id="uploadedFiles" class="space-y-3"></div>
-            </div>
-
-            <!-- Quick Stats -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="stats">
-                <!-- Stats will be inserted here -->
-            </div>
-        </div>
-
-        <!-- Documents Tab -->
-        <div id="content-documents" class="tab-content hidden">
-            <div class="card rounded-2xl p-8">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-gray-800">📁 Your Documents</h2>
-                    <button onclick="loadDocuments()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
-                        🔄 Refresh
-                    </button>
-                </div>
-                
-                <div id="documentsList" class="space-y-4">
-                    <div class="text-center py-12 text-gray-500">
-                        <svg class="mx-auto h-16 w-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        <p>No documents uploaded yet</p>
+                <!-- Input Area - Fixed at Bottom -->
+                <div class="flex-shrink-0 border-t border-gray-900 bg-black/95 backdrop-blur-xl">
+                    <div class="max-w-4xl mx-auto px-6 py-4">
+                        <div class="relative">
+                            <textarea 
+                                id="queryInput" 
+                                rows="1"
+                                placeholder="Message RAG Intelligence..." 
+                                class="w-full bg-gray-900 border border-gray-800 text-white placeholder-gray-500 rounded-2xl pl-6 pr-14 py-4 text-base resize-none focus:outline-none focus:border-gray-700 focus:ring-2 focus:ring-gray-800 transition-all shadow-xl max-h-32 overflow-y-auto"
+                                onkeydown="handleKeyDown(event)"
+                                oninput="autoResize(this)"
+                            ></textarea>
+                            <button 
+                                onclick="askQuestion()" 
+                                id="sendButton"
+                                class="absolute right-3 bottom-3 p-2.5 bg-white text-black rounded-xl hover:bg-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="text-center text-xs text-gray-600 mt-2">AI can make mistakes. Verify important information.</p>
                     </div>
                 </div>
-            </div>
-        </div>
-
-        <!-- Query Tab -->
-        <div id="content-query" class="tab-content hidden">
-            <div class="card rounded-2xl p-8 mb-6">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">💬 Ask AI About Your Documents</h2>
-                <p class="text-gray-600 mb-6">Ask questions and get intelligent answers with source citations</p>
-                
-                <div class="mb-6">
-                    <div class="flex gap-3">
-                        <input 
-                            type="text" 
-                            id="queryInput" 
-                            placeholder="e.g., What are the shipping costs?" 
-                            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            onkeypress="if(event.key==='Enter') askQuestion()"
-                        >
-                        <button onclick="askQuestion()" class="px-8 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold">
-                            Ask AI
-                        </button>
-                    </div>
-                    
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        <span class="text-sm text-gray-500">Quick queries:</span>
-                        <button onclick="quickQuery('What products are available?')" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition">
-                            Products
-                        </button>
-                        <button onclick="quickQuery('What is the return policy?')" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition">
-                            Returns
-                        </button>
-                        <button onclick="quickQuery('How much does shipping cost?')" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition">
-                            Shipping
-                        </button>
-                    </div>
-                </div>
-
-                <div id="chatContainer" class="space-y-4 max-h-96 overflow-y-auto">
-                    <div class="text-center py-8 text-gray-400">
-                        <svg class="mx-auto h-16 w-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
-                        </svg>
-                        <p>Ask a question to get started</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+            </section>
+        </main>
     </div>
 
     <script>
         const API_URL = 'http://localhost:3000/api';
         
-        // Tab switching
         function switchTab(tab) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('button[id^="tab-"]').forEach(el => el.classList.remove('bg-white/20'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
             
             document.getElementById(`content-${tab}`).classList.remove('hidden');
-            document.getElementById(`tab-${tab}`).classList.add('bg-white/20');
+            document.getElementById(`tab-${tab}`).classList.add('active');
             
             if (tab === 'documents') loadDocuments();
             if (tab === 'upload') loadStats();
+            if (tab === 'query') setTimeout(() => document.getElementById('queryInput')?.focus(), 100);
         }
 
-        // File upload handling
+        // Auto-resize textarea
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 128) + 'px';
+        }
+
+        // Handle Enter key
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                askQuestion();
+            }
+        }
+
+        // File Upload
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
 
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
         });
 
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('dragover');
-        });
-
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('border-white'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-white'));
         dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
+            dropZone.classList.remove('border-white');
             handleFiles(e.dataTransfer.files);
         });
 
-        dropZone.addEventListener('click', () => {
-            fileInput.click();
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
-        });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
         async function handleFiles(files) {
             const uploadedFilesDiv = document.getElementById('uploadedFiles');
@@ -262,170 +278,219 @@
                 formData.append('document', file);
 
                 try {
-                    const response = await fetch(`${API_URL}/upload`, {
-                        method: 'POST',
-                        body: formData
-                    });
-
+                    const response = await fetch(`${API_URL}/upload`, { method: 'POST', body: formData });
                     const result = await response.json();
 
                     if (result.success) {
-                        // Add to uploaded files list
+                        const docId = result.data.documentId;
                         const fileCard = document.createElement('div');
-                        fileCard.className = 'bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between';
+                        fileCard.className = 'bg-gray-900/50 border border-gray-800 rounded-xl p-4 flex items-center justify-between animate-fade-in';
+                        fileCard.id = `doc-${docId}`;
                         fileCard.innerHTML = `
-                            <div class="flex items-center">
-                                <svg class="w-6 h-6 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                <div>
-                                    <p class="font-semibold text-gray-800">${file.name}</p>
-                                    <p class="text-sm text-gray-600">Document ID: ${result.data.documentId}</p>
+                            <div class="flex items-center gap-3 flex-1">
+                                <div class="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-gray-400">
+                                    ${file.type.includes('image') ? '🖼️' : file.type.includes('pdf') ? '📕' : '📄'}
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-white">${file.name}</p>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <div class="loader-small"></div>
+                                        <p class="text-xs text-gray-400" id="status-${docId}">Processing OCR...</p>
+                                    </div>
                                 </div>
                             </div>
-                            <button onclick="indexDocument(${result.data.documentId})" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm">
-                                Index Now
-                            </button>
+                            <div id="action-${docId}" class="text-xs text-gray-500"></div>
                         `;
                         uploadedFilesDiv.prepend(fileCard);
-
-                        statusText.textContent = `✓ ${file.name} uploaded successfully!`;
-                        setTimeout(() => statusDiv.classList.add('hidden'), 3000);
+                        pollDocumentStatus(docId, file.name);
+                        statusDiv.classList.add('hidden');
                     }
                 } catch (error) {
-                    statusText.textContent = `✗ Failed to upload ${file.name}`;
-                    statusDiv.querySelector('.bg-blue-50').className = 'bg-red-50 border border-red-200 rounded-lg p-4';
+                    console.error(error);
+                    statusText.textContent = 'Upload failed';
+                    setTimeout(() => statusDiv.classList.add('hidden'), 3000);
                 }
             }
-
             loadStats();
         }
 
-        async function indexDocument(docId) {
-            try {
-                const response = await fetch(`${API_URL}/index/${docId}`, {
-                    method: 'POST'
-                });
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert(`Document ${docId} is being indexed! This takes 60-90 seconds.`);
+        async function pollDocumentStatus(docId, fileName) {
+            const maxAttempts = 40;
+            let attempts = 0;
+            
+            const interval = setInterval(async () => {
+                attempts++;
+                try {
+                    const docResponse = await fetch(`${API_URL}/documents/${docId}`);
+                    const docResult = await docResponse.json();
+                    
+                    if (docResult.success && docResult.data) {
+                        const doc = docResult.data;
+                        const statusEl = document.getElementById(`status-${docId}`);
+                        const actionEl = document.getElementById(`action-${docId}`);
+                        const card = document.getElementById(`doc-${docId}`);
+                        
+                        if (doc.status === 'completed') {
+                            const indexResp = await fetch(`${API_URL}/index/${docId}`);
+                            const indexResult = await indexResp.json();
+                            
+                            if (indexResult.success && indexResult.data.chunksCount > 0) {
+                                statusEl.innerHTML = `✓ Ready - ${indexResult.data.chunksCount} chunks indexed`;
+                                statusEl.className = 'text-xs text-green-400 font-medium';
+                                const loader = card.querySelector('.loader-small');
+                                if (loader) loader.remove();
+                                actionEl.innerHTML = `<div class="px-3 py-1.5 bg-green-900/30 text-green-400 border border-green-900 rounded-md font-medium">Indexed</div>`;
+                                clearInterval(interval);
+                                loadStats();
+                            } else if (attempts > 25) {
+                                statusEl.innerHTML = '⚠️ Indexing in progress...';
+                                statusEl.className = 'text-xs text-yellow-400';
+                            } else {
+                                statusEl.innerHTML = '⚡ Generating embeddings...';
+                                statusEl.className = 'text-xs text-blue-400';
+                            }
+                        } else if (doc.status === 'processing') {
+                            statusEl.innerHTML = '🔄 Processing OCR...';
+                            statusEl.className = 'text-xs text-blue-400';
+                        } else if (doc.status === 'failed') {
+                            statusEl.innerHTML = '✗ Processing failed';
+                            statusEl.className = 'text-xs text-red-400';
+                            const loader = card.querySelector('.loader-small');
+                            if (loader) loader.remove();
+                            actionEl.innerHTML = `<div class="px-3 py-1.5 bg-red-900/30 text-red-400 border border-red-900 rounded-md">Failed</div>`;
+                            clearInterval(interval);
+                        } else if (attempts >= maxAttempts) {
+                            statusEl.innerHTML = '⏱️ Taking longer than expected';
+                            statusEl.className = 'text-xs text-yellow-400';
+                            clearInterval(interval);
+                        }
+                    }
+                } catch (error) {
+                    if (attempts >= maxAttempts) clearInterval(interval);
                 }
-            } catch (error) {
-                alert('Failed to index document');
-            }
+            }, 3000);
         }
 
         async function loadStats() {
             try {
                 const response = await fetch(`${API_URL}/documents/stats/summary`);
                 const result = await response.json();
-                
                 if (result.success) {
                     const stats = result.data;
                     document.getElementById('stats').innerHTML = `
-                        <div class="card rounded-xl p-6">
-                            <div class="text-3xl font-bold text-purple-600 mb-2">${stats.total || 0}</div>
-                            <div class="text-gray-600">Total Documents</div>
-                        </div>
-                        <div class="card rounded-xl p-6">
-                            <div class="text-3xl font-bold text-green-600 mb-2">${stats.completed || 0}</div>
-                            <div class="text-gray-600">Processed</div>
-                        </div>
-                        <div class="card rounded-xl p-6">
-                            <div class="text-3xl font-bold text-blue-600 mb-2">${stats.totalSizeMB || '0.00'} MB</div>
-                            <div class="text-gray-600">Total Size</div>
-                        </div>
+                        <div class="stat-card"><div class="text-2xl font-bold text-white mb-1">${stats.total || 0}</div><div class="text-xs text-gray-500 uppercase tracking-wider">Documents</div></div>
+                        <div class="stat-card"><div class="text-2xl font-bold text-white mb-1">${stats.completed || 0}</div><div class="text-xs text-gray-500 uppercase tracking-wider">Processed</div></div>
+                        <div class="stat-card"><div class="text-2xl font-bold text-white mb-1">${stats.totalSizeMB || '0.00'} MB</div><div class="text-xs text-gray-500 uppercase tracking-wider">Storage</div></div>
                     `;
                 }
-            } catch (error) {
-                console.error('Failed to load stats:', error);
-            }
+            } catch (e) {}
         }
 
         async function loadDocuments() {
             const listDiv = document.getElementById('documentsList');
-            listDiv.innerHTML = '<div class="text-center py-8 text-gray-500">Loading...</div>';
-
+            listDiv.innerHTML = '<div class="text-center py-12 text-gray-600"><div class="loader mx-auto mb-3"></div>Loading library...</div>';
+            
             try {
                 const response = await fetch(`${API_URL}/documents`);
                 const result = await response.json();
-
+                
                 if (result.success && result.data.length > 0) {
-                    listDiv.innerHTML = result.data.map(doc => `
-                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                    listDiv.innerHTML = result.data.map(doc => {
+                        const icon = doc.file_type.includes('pdf') ? '📕' : doc.file_type.includes('image') ? '🖼️' : '📄';
+                        return `
+                        <div class="group bg-gray-900/30 border border-gray-800 rounded-xl p-5 hover:border-gray-600 transition-all">
                             <div class="flex justify-between items-start">
-                                <div class="flex-1">
-                                    <h3 class="font-semibold text-gray-800 mb-1">${doc.original_name}</h3>
-                                    <div class="flex gap-4 text-sm text-gray-600">
-                                        <span>📄 ${doc.file_type}</span>
-                                        <span>📦 ${(doc.file_size / 1024).toFixed(2)} KB</span>
-                                        <span>📅 ${new Date(doc.upload_date).toLocaleDateString()}</span>
+                                <div class="flex items-start gap-4 flex-1">
+                                    <div class="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center text-xl">${icon}</div>
+                                    <div class="flex-1 min-w-0">
+                                        <h3 class="font-medium text-white group-hover:text-gray-200 transition truncate">${doc.original_name}</h3>
+                                        <div class="flex gap-3 text-xs text-gray-500 mt-1">
+                                            <span>${(doc.file_size / 1024).toFixed(1)} KB</span>
+                                            <span>•</span>
+                                            <span>${new Date(doc.upload_date).toLocaleDateString()}</span>
+                                            ${doc.extracted_text ? `<span>•</span><span>${doc.extracted_text.length} chars</span>` : ''}
+                                        </div>
                                     </div>
                                 </div>
-                                <span class="px-3 py-1 rounded-full text-xs font-semibold ${
-                                    doc.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                    doc.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                                    doc.status === 'failed' ? 'bg-red-100 text-red-800' :
-                                    'bg-gray-100 text-gray-800'
-                                }">
-                                    ${doc.status}
-                                </span>
+                                <div class="flex items-center gap-3">
+                                    <span class="status-badge status-${doc.status}">${doc.status}</span>
+                                    <button onclick="deleteDocument(${doc.id})" class="text-gray-600 hover:text-red-400 transition p-1">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    `).join('');
+                    `}).join('');
                 } else {
-                    listDiv.innerHTML = '<div class="text-center py-12 text-gray-500">No documents found</div>';
+                    listDiv.innerHTML = '<div class="text-center py-12 text-gray-600">No documents in library. Upload some first.</div>';
                 }
-            } catch (error) {
-                listDiv.innerHTML = '<div class="text-center py-12 text-red-500">Failed to load documents</div>';
+            } catch (e) {
+                listDiv.innerHTML = '<div class="text-center py-12 text-red-400">Failed to load library</div>';
             }
         }
 
-        function quickQuery(query) {
-            document.getElementById('queryInput').value = query;
+        async function deleteDocument(id) {
+            if (!confirm('Delete this document and all its indexed data?')) return;
+            try {
+                await fetch(`${API_URL}/documents/${id}`, { method: 'DELETE' });
+                loadDocuments();
+                loadStats();
+            } catch (e) {}
+        }
+
+        function quickQuery(q) {
+            document.getElementById('queryInput').value = q;
             askQuestion();
         }
 
         async function askQuestion() {
             const input = document.getElementById('queryInput');
             const query = input.value.trim();
-            
             if (!query) return;
 
-            const chatContainer = document.getElementById('chatContainer');
+            const container = document.getElementById('chatContainer');
+            const scrollContainer = document.getElementById('chatScrollContainer');
             
-            // Clear welcome message
-            if (chatContainer.querySelector('.text-gray-400')) {
-                chatContainer.innerHTML = '';
-            }
+            // Remove empty state
+            const emptyState = container.querySelector('.min-h-\\[calc\\(100vh-300px\\)\\]');
+            if (emptyState) emptyState.remove();
 
-            // Add user message
+            // User message
             const userMsg = document.createElement('div');
-            userMsg.className = 'chat-message flex justify-end';
+            userMsg.className = 'flex justify-end mb-6 animate-fade-in';
             userMsg.innerHTML = `
-                <div class="bg-purple-600 text-white rounded-lg px-4 py-3 max-w-md">
-                    ${query}
+                <div class="max-w-[85%] bg-white text-black rounded-3xl rounded-tr-md px-6 py-4 shadow-lg">
+                    <p class="text-[15px] leading-relaxed">${escapeHtml(query)}</p>
                 </div>
             `;
-            chatContainer.appendChild(userMsg);
+            container.appendChild(userMsg);
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            input.value = '';
+            input.style.height = 'auto';
 
-            // Add loading message
+            // Loading
+            const loadingId = 'loading-' + Date.now();
             const loadingMsg = document.createElement('div');
-            loadingMsg.className = 'chat-message flex justify-start';
+            loadingMsg.id = loadingId;
+            loadingMsg.className = 'flex justify-start mb-6 animate-fade-in';
             loadingMsg.innerHTML = `
-                <div class="bg-gray-100 rounded-lg px-4 py-3">
-                    <div class="loading-dots">
-                        <span>●</span>
-                        <span>●</span>
-                        <span>●</span>
+                <div class="flex items-start gap-3 max-w-[85%]">
+                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div class="bg-gray-900 border border-gray-800 rounded-3xl rounded-tl-md px-6 py-4">
+                        <div class="flex gap-1.5">
+                            <div class="w-2 h-2 bg-gray-600 rounded-full animate-bounce"></div>
+                            <div class="w-2 h-2 bg-gray-600 rounded-full animate-bounce" style="animation-delay: 0.15s"></div>
+                            <div class="w-2 h-2 bg-gray-600 rounded-full animate-bounce" style="animation-delay: 0.3s"></div>
+                        </div>
                     </div>
                 </div>
             `;
-            chatContainer.appendChild(loadingMsg);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-
-            input.value = '';
+            container.appendChild(loadingMsg);
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
 
             try {
                 const response = await fetch(`${API_URL}/query`, {
@@ -433,58 +498,78 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query })
                 });
-
                 const result = await response.json();
                 
-                // Remove loading message
-                loadingMsg.remove();
+                document.getElementById(loadingId).remove();
 
                 if (result.success) {
-                    // Add AI response
+                    const sourcesHtml = result.sources?.length ? result.sources.map(s => `
+                        <div class="inline-flex items-center gap-2 bg-gray-800/50 border border-gray-700/50 px-3 py-1.5 rounded-full text-xs hover:bg-gray-800 transition-colors">
+                            <span class="font-mono text-gray-400">${(s.similarity * 100).toFixed(0)}%</span>
+                            <span class="text-gray-300">${escapeHtml(s.filename)}</span>
+                        </div>
+                    `).join('') : '';
+
                     const aiMsg = document.createElement('div');
-                    aiMsg.className = 'chat-message flex justify-start';
+                    aiMsg.className = 'flex justify-start mb-6 animate-fade-in';
                     aiMsg.innerHTML = `
-                        <div class="bg-gray-100 rounded-lg px-4 py-3 max-w-2xl">
-                            <p class="text-gray-800 mb-3">${result.answer}</p>
-                            ${result.sources && result.sources.length > 0 ? `
-                                <div class="border-t border-gray-300 pt-2 mt-2">
-                                    <p class="text-xs font-semibold text-gray-600 mb-1">📎 Sources:</p>
-                                    ${result.sources.map(s => `
-                                        <div class="text-xs text-gray-600">
-                                            • ${s.filename} (${(s.similarity * 100).toFixed(1)}% match)
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            ` : ''}
+                        <div class="flex items-start gap-3 max-w-[85%]">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center flex-shrink-0">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                            </div>
+                            <div class="bg-gray-900 border border-gray-800 rounded-3xl rounded-tl-md px-6 py-5 shadow-xl">
+                                <div class="text-[15px] leading-loose text-gray-200 mb-4">${parseMarkdown(result.answer)}</div>
+                                ${sourcesHtml ? `
+                                    <div class="border-t border-gray-800 pt-4 mt-4">
+                                        <p class="text-[10px] uppercase tracking-widest text-gray-600 mb-3 font-bold">Sources</p>
+                                        <div class="flex flex-wrap gap-2">${sourcesHtml}</div>
+                                    </div>
+                                ` : ''}
+                            </div>
                         </div>
                     `;
-                    chatContainer.appendChild(aiMsg);
+                    container.appendChild(aiMsg);
                 } else {
-                    const errorMsg = document.createElement('div');
-                    errorMsg.className = 'chat-message flex justify-start';
-                    errorMsg.innerHTML = `
-                        <div class="bg-red-100 text-red-800 rounded-lg px-4 py-3 max-w-md">
-                            ❌ ${result.error || 'Failed to get answer'}
-                        </div>
-                    `;
-                    chatContainer.appendChild(errorMsg);
+                    throw new Error(result.error || 'Query failed');
                 }
             } catch (error) {
-                loadingMsg.remove();
+                document.getElementById(loadingId)?.remove();
                 const errorMsg = document.createElement('div');
-                errorMsg.className = 'chat-message flex justify-start';
+                errorMsg.className = 'flex justify-start mb-6 animate-fade-in';
                 errorMsg.innerHTML = `
-                    <div class="bg-red-100 text-red-800 rounded-lg px-4 py-3 max-w-md">
-                        ❌ Connection error. Is the backend running?
+                    <div class="flex items-start gap-3 max-w-[85%]">
+                        <div class="w-8 h-8 rounded-full bg-red-900 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-red-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <div class="bg-red-950/30 border border-red-900/50 rounded-3xl rounded-tl-md px-6 py-4">
+                            <p class="text-sm text-red-200">${escapeHtml(error.message) || 'Connection error'}</p>
+                        </div>
                     </div>
                 `;
-                chatContainer.appendChild(errorMsg);
+                container.appendChild(errorMsg);
             }
-
-            chatContainer.scrollTop = chatContainer.scrollHeight;
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
         }
 
-        // Initialize
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function parseMarkdown(text) {
+            let parsed = escapeHtml(text);
+            parsed = parsed.replace(/\*\*(.+?)\*\*/g, '<strong class="font-semibold text-white">$1</strong>');
+            parsed = parsed.replace(/\*(.+?)\*/g, '<em class="italic text-gray-400">$1</em>');
+            parsed = parsed.replace(/`(.+?)`/g, 'de class="bg-gray-800 border border-gray-700 px-2 py-0.5 rounded text-sm font-mono text-gray-300">$1</code>');
+            parsed = parsed.replace(/\n/g, '<br>');
+            return parsed;
+        }
+        
         switchTab('upload');
         loadStats();
     </script>

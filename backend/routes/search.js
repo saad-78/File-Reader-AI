@@ -6,12 +6,12 @@ const logger = require('../utils/logger');
 const router = express.Router();
 
 /**
- * GET /api/search?q=query&limit=5
- * Semantic search across all documents
+ * GET /api/search?q=query&limit=10
+ * Semantic search with lower threshold for better recall
  */
 router.get('/', async (req, res) => {
   try {
-    const { q, limit = 5, min_similarity = 0.3 } = req.query;
+    const { q, limit = 10, min_similarity = 0.2 } = req.query; // Lowered from 0.3 to 0.2
 
     if (!q || q.trim().length === 0) {
       return res.status(400).json({
@@ -25,11 +25,13 @@ router.get('/', async (req, res) => {
     // Generate embedding for query
     const queryEmbedding = await embeddingService.generateEmbedding(q);
 
-    // Search similar chunks
+    // Search similar chunks with more liberal threshold
     const results = vectorStore.searchSimilar(queryEmbedding, {
       limit: parseInt(limit),
       minSimilarity: parseFloat(min_similarity)
     });
+
+    logger.success(`Found ${results.length} results for query`);
 
     res.json({
       success: true,

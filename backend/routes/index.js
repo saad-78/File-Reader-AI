@@ -2,14 +2,14 @@ const express = require('express');
 const storageService = require('../services/storage');
 const embeddingService = require('../services/embeddings');
 const vectorStore = require('../services/vectorStore');
-const { chunkText } = require('../utils/chunker');
+const { chunkText, preprocessText } = require('../utils/chunker');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
 /**
  * POST /api/index/:id
- * Index a document (generate embeddings and store in vector DB)
+ * Index document with improved chunking
  */
 router.post('/:id', async (req, res) => {
   try {
@@ -22,7 +22,6 @@ router.post('/:id', async (req, res) => {
       });
     }
 
-    // Get document
     const document = storageService.getDocument(docId);
 
     if (!document) {
@@ -46,7 +45,6 @@ router.post('/:id', async (req, res) => {
       });
     }
 
-    // Return immediate response
     res.status(202).json({
       success: true,
       message: 'Document indexing started',
@@ -62,29 +60,32 @@ router.post('/:id', async (req, res) => {
       try {
         logger.info(`Starting indexing for document ${docId}`);
 
-        // Step 1: Chunk the text
-        const chunks = chunkText(document.extracted_text, {
-          chunkSize: 400,
-          overlap: 50,
-          minChunkSize: 20
+        // Preprocess text
+        const cleanedText = preprocessText(document.extracted_text);
+
+        // Chunk with improved strategy
+        const chunks = chunkText(cleanedText, {
+          chunkSize: 500,      // Larger chunks for more context
+          overlap: 100,        // More overlap for continuity
+          minChunkSize: 50
         });
 
         if (chunks.length === 0) {
-          throw new Error('No valid chunks generated');
+          throw new Error('No valid chunks generated from document');
         }
 
-        logger.info(`Generated ${chunks.length} chunks`);
+        logger.info(`Generated ${chunks.length} chunks (avg ${Math.round(cleanedText.length / chunks.length)} chars each)`);
 
-        // Step 2: Store chunks
+        // Store chunks
         const chunkIds = vectorStore.storeChunks(docId, chunks);
 
-        // Step 3: Generate embeddings
+        // Generate embeddings
         const embeddings = await embeddingService.generateBatchEmbeddings(chunks);
 
-        // Step 4: Store embeddings
+        // Store embeddings
         vectorStore.storeEmbeddings(chunkIds, embeddings);
 
-        logger.success(`Document ${docId} indexed successfully with ${chunks.length} chunks`);
+        logger.success(`Document ${docId} indexed successfully: ${chunks.length} chunks, ${embeddings.filter(e => e).length} embeddings`);
 
       } catch (error) {
         logger.error(`Failed to index document ${docId}`, error);
@@ -102,7 +103,7 @@ router.post('/:id', async (req, res) => {
 
 /**
  * GET /api/index/:id
- * Get indexing status for a document
+ * Get indexing status
  */
 router.get('/:id', (req, res) => {
   try {
@@ -118,7 +119,7 @@ router.get('/:id', (req, res) => {
         chunks: chunks.map(c => ({
           index: c.chunk_index,
           wordCount: c.word_count,
-          preview: c.chunk_text.substring(0, 100) + '...'
+          preview: c.chunk_text.substring(0, 150) + '...'
         }))
       }
     });
@@ -133,7 +134,7 @@ router.get('/:id', (req, res) => {
 
 /**
  * DELETE /api/index/:id
- * Delete index for a document
+ * Delete index
  */
 router.delete('/:id', (req, res) => {
   try {

@@ -3,72 +3,77 @@ const logger = require('../utils/logger');
 
 class LLMService {
   constructor() {
-    this.baseURL = process.env.OLLAMA_URL || 'http://localhost:11434';
-    this.defaultModel = process.env.OLLAMA_MODEL || 'phi3:mini';
-    this.timeout = 120000; // 2 minutes
+    // Groq API configuration
+    this.apiKey = process.env.GROQ_API_KEY;
+    this.model = 'llama-3.1-8b-instant'; // Fast and free
+    this.baseURL = 'https://api.groq.com/openai/v1';
   }
 
   /**
-   * Check if Ollama is available
+   * Check if Groq API is available
    */
   async checkAvailability() {
-    try {
-      const response = await axios.get(`${this.baseURL}/api/tags`, {
-        timeout: 5000
-      });
-      return response.status === 200;
-    } catch (error) {
+    if (!this.apiKey) {
+      logger.error('GROQ_API_KEY not set in environment variables');
       return false;
     }
+    return true;
   }
 
   /**
-   * Generate response using Ollama
+   * Generate response using Groq API
    */
   async generate(prompt, options = {}) {
     const {
-      model = this.defaultModel,
-      system = null,
+      system = 'You are a helpful AI assistant.',
       temperature = 0.7,
       maxTokens = 500
     } = options;
 
     try {
-      logger.info(`Generating response with model: ${model}`);
-
-      const payload = {
-        model: model,
-        prompt: prompt,
-        stream: false,
-        options: {
-          temperature: temperature,
-          num_predict: maxTokens
-        }
-      };
-
-      if (system) {
-        payload.system = system;
-      }
+      logger.info(`Generating response with Groq (${this.model})`);
 
       const response = await axios.post(
-        `${this.baseURL}/api/generate`,
-        payload,
-        { timeout: this.timeout }
+        `${this.baseURL}/chat/completions`,
+        {
+          model: this.model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: prompt }
+          ],
+          temperature: temperature,
+          max_tokens: maxTokens
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 30000
+        }
       );
 
-      logger.success('LLM response generated');
+      const result = response.data.choices[0].message.content;
+      const usage = response.data.usage;
+
+      logger.success('Groq response generated');
+      logger.debug(`Tokens: ${usage.total_tokens} (prompt: ${usage.prompt_tokens}, completion: ${usage.completion_tokens})`);
+
       return {
-        text: response.data.response,
-        model: response.data.model,
-        tokensGenerated: response.data.eval_count || null,
-        timeMs: response.data.total_duration ? Math.round(response.data.total_duration / 1000000) : null
+        text: result,
+        model: this.model,
+        tokensGenerated: usage.completion_tokens,
+        timeMs: null
       };
     } catch (error) {
-      if (error.code === 'ECONNREFUSED') {
-        throw new Error('Ollama is not running. Please start Ollama first: ollama serve');
+      if (error.response?.status === 401) {
+        throw new Error('Invalid Groq API key. Please check your GROQ_API_KEY in .env file');
       }
-      logger.error('Failed to generate LLM response', error);
-      throw new Error(`LLM generation failed: ${error.message}`);
+      if (error.response?.status === 429) {
+        throw new Error('Groq API rate limit exceeded. Please try again later.');
+      }
+      logger.error('Failed to generate Groq response', error);
+      throw new Error(`Groq API error: ${error.message}`);
     }
   }
 
@@ -99,13 +104,11 @@ Please provide a clear and accurate answer based on the context above:`;
    * Get available models
    */
   async listModels() {
-    try {
-      const response = await axios.get(`${this.baseURL}/api/tags`);
-      return response.data.models || [];
-    } catch (error) {
-      logger.error('Failed to list models', error);
-      return [];
-    }
+    return [
+      { name: 'llama-3.1-8b-instant' },
+      { name: 'llama-3.1-70b-versatile' },
+      { name: 'mixtral-8x7b-32768' }
+    ];
   }
 }
 
