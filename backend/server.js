@@ -1,130 +1,52 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const morgan = require('morgan');
 const path = require('path');
-const logger = require('./utils/logger');
+const fs = require('fs');
 
-// Initialize database (including vector tables)
-require('./db/vector-init');
-
-// Create Express app
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || '*',
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(morgan('dev'));
 
-// Routes
-const uploadRoutes = require('./routes/upload');
-const documentRoutes = require('./routes/documents');
-const webhookRoutes = require('./routes/webhook');
-const indexRoutes = require('./routes/index');
-const searchRoutes = require('./routes/search');
-const queryRoutes = require('./routes/query');
-
-// API Routes
-app.use('/api/upload', uploadRoutes);
-app.use('/api/documents', documentRoutes);
-app.use('/api/webhook', webhookRoutes);
-app.use('/api/index', indexRoutes);
-app.use('/api/search', searchRoutes);
-app.use('/api/query', queryRoutes);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    success: true,
-    message: 'RAG System API is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    version: '2.0.0',
-    phase: 2
-  });
+// Create necessary directories
+const dirs = ['uploads', 'db', 'models'];
+dirs.forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
 });
 
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    success: true,
-    message: 'Welcome to RAG Document Processing System - Phase 2',
-    version: '2.0.0',
-    phase: 2,
-    features: [
-      'Document upload & OCR',
-      'Vector embeddings',
-      'Semantic search',
-      'AI-powered Q&A'
-    ],
-    endpoints: {
-      health: '/health',
-      upload: '/api/upload',
-      documents: '/api/documents',
-      index: '/api/index/:id',
-      search: '/api/search?q=query',
-      query: '/api/query',
-      webhook: '/api/webhook/ingest'
-    }
-  });
+// Routes
+app.use('/api/upload', require('./routes/upload'));
+app.use('/api/documents', require('./routes/documents'));
+app.use('/api/index', require('./routes/index'));
+app.use('/api/query', require('./routes/query'));
+app.use('/api/webhook', require('./routes/webhook'));
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // 404 handler
 app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint not found',
-    path: req.path
-  });
+  res.status(404).json({ error: 'Route not found' });
 });
 
 // Error handler
 app.use((err, req, res, next) => {
-  logger.error('Server error', err);
-  
-  res.status(err.status || 500).json({
-    success: false,
-    error: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  });
+  console.error('Server error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, () => {
-  logger.success(`
-╔══════════════════════════════════════════════════════╗
-║                                                      ║
-║     RAG DOCUMENT PROCESSING SYSTEM - PHASE 2        ║
-║                                                      ║
-║     Server running on: http://localhost:${PORT}     ║
-║     Environment: ${process.env.NODE_ENV || 'development'}                           ║
-║                                                      ║
-║     NEW Features:                                    ║
-║     ✓ Vector Embeddings (Transformers.js)           ║
-║     ✓ Semantic Search (SQLite-vec)                  ║
-║     ✓ AI Q&A (Ollama Integration)                   ║
-║                                                      ║
-║     Phase 2 Endpoints:                               ║
-║     - POST /api/index/:id                            ║
-║     - GET  /api/search?q=...                         ║
-║     - POST /api/query                                ║
-║                                                      ║
-╚══════════════════════════════════════════════════════╝
-  `);
-  
-  logger.info('Make sure Ollama is running: ollama serve');
-  logger.info('Pull a model if needed: ollama pull phi3:mini');
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ RAG Backend running on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    logger.success('Server closed');
-    process.exit(0);
-  });
-});
-
-module.exports = app;
