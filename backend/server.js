@@ -1,0 +1,130 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const path = require('path');
+const logger = require('./utils/logger');
+
+// Initialize database (including vector tables)
+require('./db/vector-init');
+
+// Create Express app
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan('dev'));
+
+// Routes
+const uploadRoutes = require('./routes/upload');
+const documentRoutes = require('./routes/documents');
+const webhookRoutes = require('./routes/webhook');
+const indexRoutes = require('./routes/index');
+const searchRoutes = require('./routes/search');
+const queryRoutes = require('./routes/query');
+
+// API Routes
+app.use('/api/upload', uploadRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/webhook', webhookRoutes);
+app.use('/api/index', indexRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/query', queryRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'RAG System API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '2.0.0',
+    phase: 2
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Welcome to RAG Document Processing System - Phase 2',
+    version: '2.0.0',
+    phase: 2,
+    features: [
+      'Document upload & OCR',
+      'Vector embeddings',
+      'Semantic search',
+      'AI-powered Q&A'
+    ],
+    endpoints: {
+      health: '/health',
+      upload: '/api/upload',
+      documents: '/api/documents',
+      index: '/api/index/:id',
+      search: '/api/search?q=query',
+      query: '/api/query',
+      webhook: '/api/webhook/ingest'
+    }
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Endpoint not found',
+    path: req.path
+  });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  logger.error('Server error', err);
+  
+  res.status(err.status || 500).json({
+    success: false,
+    error: err.message || 'Internal server error',
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+  });
+});
+
+// Start server
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, () => {
+  logger.success(`
+╔══════════════════════════════════════════════════════╗
+║                                                      ║
+║     RAG DOCUMENT PROCESSING SYSTEM - PHASE 2        ║
+║                                                      ║
+║     Server running on: http://localhost:${PORT}     ║
+║     Environment: ${process.env.NODE_ENV || 'development'}                           ║
+║                                                      ║
+║     NEW Features:                                    ║
+║     ✓ Vector Embeddings (Transformers.js)           ║
+║     ✓ Semantic Search (SQLite-vec)                  ║
+║     ✓ AI Q&A (Ollama Integration)                   ║
+║                                                      ║
+║     Phase 2 Endpoints:                               ║
+║     - POST /api/index/:id                            ║
+║     - GET  /api/search?q=...                         ║
+║     - POST /api/query                                ║
+║                                                      ║
+╚══════════════════════════════════════════════════════╝
+  `);
+  
+  logger.info('Make sure Ollama is running: ollama serve');
+  logger.info('Pull a model if needed: ollama pull phi3:mini');
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down gracefully...');
+  server.close(() => {
+    logger.success('Server closed');
+    process.exit(0);
+  });
+});
+
+module.exports = app;

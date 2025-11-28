@@ -1,0 +1,21 @@
+INVOICE
+
+Invoice Number: INV-2024-001
+Date: November 28, 2025
+Due Date: December 28, 2025
+
+Bill To:
+Acme Corporation
+123 Business St
+New York, NY 10001
+
+Items:
+1. Web Development Services - $5,000.00
+2. API Integration - $3,000.00
+3. Documentation - $1,000.00
+
+Subtotal: $9,000.00
+Tax (10%): $900.00
+Total: $9,900.00
+
+Payment Terms: Net 30

@@ -1,0 +1,1 @@
+Invoice #001 - Customer: ABC Corp - Amount: 000

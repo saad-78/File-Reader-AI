@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Document Intelligence System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        }
+        
+        .upload-zone {
+            border: 2px dashed #cbd5e0;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-zone.dragover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+        
+        .pulse-dot {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        
+        .chat-message {
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .loading-dots span {
+            animation: blink 1.4s infinite both;
+        }
+        
+        .loading-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .loading-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes blink {
+            0%, 80%, 100% { opacity: 0; }
+            40% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="gradient-bg text-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <svg class="w-8 h-8 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span class="text-xl font-bold">RAG Intelligence</span>
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="switchTab('upload')" id="tab-upload" class="px-4 py-2 rounded-lg hover:bg-white/20 transition">
+                        📤 Upload
+                    </button>
+                    <button onclick="switchTab('documents')" id="tab-documents" class="px-4 py-2 rounded-lg hover:bg-white/20 transition">
+                        📁 Documents
+                    </button>
+                    <button onclick="switchTab('query')" id="tab-query" class="px-4 py-2 rounded-lg hover:bg-white/20 transition">
+                        💬 Ask AI
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Upload Tab -->
+        <div id="content-upload" class="tab-content">
+            <div class="card rounded-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">📤 Upload Documents</h2>
+                <p class="text-gray-600 mb-6">Upload PDF, images, or text files for AI-powered analysis</p>
+                
+                <div id="dropZone" class="upload-zone rounded-xl p-12 text-center cursor-pointer mb-6">
+                    <svg class="mx-auto h-16 w-16 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <p class="text-lg font-semibold text-gray-700 mb-2">Drag & drop files here</p>
+                    <p class="text-sm text-gray-500 mb-4">or click to browse</p>
+                    <input type="file" id="fileInput" class="hidden" multiple accept=".pdf,.txt,.jpg,.jpeg,.png">
+                    <button onclick="document.getElementById('fileInput').click()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                        Choose Files
+                    </button>
+                </div>
+
+                <div id="uploadStatus" class="hidden mb-4">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="pulse-dot w-3 h-3 bg-blue-600 rounded-full mr-3"></div>
+                            <span class="text-blue-800" id="uploadStatusText">Processing...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="uploadedFiles" class="space-y-3"></div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="stats">
+                <!-- Stats will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Documents Tab -->
+        <div id="content-documents" class="tab-content hidden">
+            <div class="card rounded-2xl p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">📁 Your Documents</h2>
+                    <button onclick="loadDocuments()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">
+                        🔄 Refresh
+                    </button>
+                </div>
+                
+                <div id="documentsList" class="space-y-4">
+                    <div class="text-center py-12 text-gray-500">
+                        <svg class="mx-auto h-16 w-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <p>No documents uploaded yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Query Tab -->
+        <div id="content-query" class="tab-content hidden">
+            <div class="card rounded-2xl p-8 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">💬 Ask AI About Your Documents</h2>
+                <p class="text-gray-600 mb-6">Ask questions and get intelligent answers with source citations</p>
+                
+                <div class="mb-6">
+                    <div class="flex gap-3">
+                        <input 
+                            type="text" 
+                            id="queryInput" 
+                            placeholder="e.g., What are the shipping costs?" 
+                            class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            onkeypress="if(event.key==='Enter') askQuestion()"
+                        >
+                        <button onclick="askQuestion()" class="px-8 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold">
+                            Ask AI
+                        </button>
+                    </div>
+                    
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <span class="text-sm text-gray-500">Quick queries:</span>
+                        <button onclick="quickQuery('What products are available?')" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition">
+                            Products
+                        </button>
+                        <button onclick="quickQuery('What is the return policy?')" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition">
+                            Returns
+                        </button>
+                        <button onclick="quickQuery('How much does shipping cost?')" class="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-full transition">
+                            Shipping
+                        </button>
+                    </div>
+                </div>
+
+                <div id="chatContainer" class="space-y-4 max-h-96 overflow-y-auto">
+                    <div class="text-center py-8 text-gray-400">
+                        <svg class="mx-auto h-16 w-16 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                        </svg>
+                        <p>Ask a question to get started</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api';
+        
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('button[id^="tab-"]').forEach(el => el.classList.remove('bg-white/20'));
+            
+            document.getElementById(`content-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-${tab}`).classList.add('bg-white/20');
+            
+            if (tab === 'documents') loadDocuments();
+            if (tab === 'upload') loadStats();
+        }
+
+        // File upload handling
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        async function handleFiles(files) {
+            const uploadedFilesDiv = document.getElementById('uploadedFiles');
+            const statusDiv = document.getElementById('uploadStatus');
+            const statusText = document.getElementById('uploadStatusText');
+
+            for (const file of files) {
+                statusDiv.classList.remove('hidden');
+                statusText.textContent = `Uploading ${file.name}...`;
+
+                const formData = new FormData();
+                formData.append('document', file);
+
+                try {
+                    const response = await fetch(`${API_URL}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        // Add to uploaded files list
+                        const fileCard = document.createElement('div');
+                        fileCard.className = 'bg-green-50 border border-green-200 rounded-lg p-4 flex items-center justify-between';
+                        fileCard.innerHTML = `
+                            <div class="flex items-center">
+                                <svg class="w-6 h-6 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <div>
+                                    <p class="font-semibold text-gray-800">${file.name}</p>
+                                    <p class="text-sm text-gray-600">Document ID: ${result.data.documentId}</p>
+                                </div>
+                            </div>
+                            <button onclick="indexDocument(${result.data.documentId})" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm">
+                                Index Now
+                            </button>
+                        `;
+                        uploadedFilesDiv.prepend(fileCard);
+
+                        statusText.textContent = `✓ ${file.name} uploaded successfully!`;
+                        setTimeout(() => statusDiv.classList.add('hidden'), 3000);
+                    }
+                } catch (error) {
+                    statusText.textContent = `✗ Failed to upload ${file.name}`;
+                    statusDiv.querySelector('.bg-blue-50').className = 'bg-red-50 border border-red-200 rounded-lg p-4';
+                }
+            }
+
+            loadStats();
+        }
+
+        async function indexDocument(docId) {
+            try {
+                const response = await fetch(`${API_URL}/index/${docId}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Document ${docId} is being indexed! This takes 60-90 seconds.`);
+                }
+            } catch (error) {
+                alert('Failed to index document');
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_URL}/documents/stats/summary`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const stats = result.data;
+                    document.getElementById('stats').innerHTML = `
+                        <div class="card rounded-xl p-6">
+                            <div class="text-3xl font-bold text-purple-600 mb-2">${stats.total || 0}</div>
+                            <div class="text-gray-600">Total Documents</div>
+                        </div>
+                        <div class="card rounded-xl p-6">
+                            <div class="text-3xl font-bold text-green-600 mb-2">${stats.completed || 0}</div>
+                            <div class="text-gray-600">Processed</div>
+                        </div>
+                        <div class="card rounded-xl p-6">
+                            <div class="text-3xl font-bold text-blue-600 mb-2">${stats.totalSizeMB || '0.00'} MB</div>
+                            <div class="text-gray-600">Total Size</div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        async function loadDocuments() {
+            const listDiv = document.getElementById('documentsList');
+            listDiv.innerHTML = '<div class="text-center py-8 text-gray-500">Loading...</div>';
+
+            try {
+                const response = await fetch(`${API_URL}/documents`);
+                const result = await response.json();
+
+                if (result.success && result.data.length > 0) {
+                    listDiv.innerHTML = result.data.map(doc => `
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                            <div class="flex justify-between items-start">
+                                <div class="flex-1">
+                                    <h3 class="font-semibold text-gray-800 mb-1">${doc.original_name}</h3>
+                                    <div class="flex gap-4 text-sm text-gray-600">
+                                        <span>📄 ${doc.file_type}</span>
+                                        <span>📦 ${(doc.file_size / 1024).toFixed(2)} KB</span>
+                                        <span>📅 ${new Date(doc.upload_date).toLocaleDateString()}</span>
+                                    </div>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold ${
+                                    doc.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                    doc.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                    doc.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                    'bg-gray-100 text-gray-800'
+                                }">
+                                    ${doc.status}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    listDiv.innerHTML = '<div class="text-center py-12 text-gray-500">No documents found</div>';
+                }
+            } catch (error) {
+                listDiv.innerHTML = '<div class="text-center py-12 text-red-500">Failed to load documents</div>';
+            }
+        }
+
+        function quickQuery(query) {
+            document.getElementById('queryInput').value = query;
+            askQuestion();
+        }
+
+        async function askQuestion() {
+            const input = document.getElementById('queryInput');
+            const query = input.value.trim();
+            
+            if (!query) return;
+
+            const chatContainer = document.getElementById('chatContainer');
+            
+            // Clear welcome message
+            if (chatContainer.querySelector('.text-gray-400')) {
+                chatContainer.innerHTML = '';
+            }
+
+            // Add user message
+            const userMsg = document.createElement('div');
+            userMsg.className = 'chat-message flex justify-end';
+            userMsg.innerHTML = `
+                <div class="bg-purple-600 text-white rounded-lg px-4 py-3 max-w-md">
+                    ${query}
+                </div>
+            `;
+            chatContainer.appendChild(userMsg);
+
+            // Add loading message
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'chat-message flex justify-start';
+            loadingMsg.innerHTML = `
+                <div class="bg-gray-100 rounded-lg px-4 py-3">
+                    <div class="loading-dots">
+                        <span>●</span>
+                        <span>●</span>
+                        <span>●</span>
+                    </div>
+                </div>
+            `;
+            chatContainer.appendChild(loadingMsg);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            input.value = '';
+
+            try {
+                const response = await fetch(`${API_URL}/query`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const result = await response.json();
+                
+                // Remove loading message
+                loadingMsg.remove();
+
+                if (result.success) {
+                    // Add AI response
+                    const aiMsg = document.createElement('div');
+                    aiMsg.className = 'chat-message flex justify-start';
+                    aiMsg.innerHTML = `
+                        <div class="bg-gray-100 rounded-lg px-4 py-3 max-w-2xl">
+                            <p class="text-gray-800 mb-3">${result.answer}</p>
+                            ${result.sources && result.sources.length > 0 ? `
+                                <div class="border-t border-gray-300 pt-2 mt-2">
+                                    <p class="text-xs font-semibold text-gray-600 mb-1">📎 Sources:</p>
+                                    ${result.sources.map(s => `
+                                        <div class="text-xs text-gray-600">
+                                            • ${s.filename} (${(s.similarity * 100).toFixed(1)}% match)
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    chatContainer.appendChild(aiMsg);
+                } else {
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'chat-message flex justify-start';
+                    errorMsg.innerHTML = `
+                        <div class="bg-red-100 text-red-800 rounded-lg px-4 py-3 max-w-md">
+                            ❌ ${result.error || 'Failed to get answer'}
+                        </div>
+                    `;
+                    chatContainer.appendChild(errorMsg);
+                }
+            } catch (error) {
+                loadingMsg.remove();
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'chat-message flex justify-start';
+                errorMsg.innerHTML = `
+                    <div class="bg-red-100 text-red-800 rounded-lg px-4 py-3 max-w-md">
+                        ❌ Connection error. Is the backend running?
+                    </div>
+                `;
+                chatContainer.appendChild(errorMsg);
+            }
+
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Initialize
+        switchTab('upload');
+        loadStats();
+    </script>
+</body>
+</html>

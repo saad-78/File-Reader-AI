@@ -1,0 +1,1 @@
+Invoice #002 - Customer: XYZ Ltd - Amount: 500

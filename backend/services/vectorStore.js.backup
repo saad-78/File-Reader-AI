@@ -1,0 +1,216 @@
+const db = require('../db/vector-init');
+const logger = require('../utils/logger');
+
+class VectorStore {
+  /**
+   * Store text chunks for a document
+   */
+  storeChunks(docId, chunks) {
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO chunks (doc_id, chunk_index, chunk_text, word_count)
+        VALUES (?, ?, ?, ?)
+      `);
+
+      const chunkIds = [];
+      const transaction = db.transaction((chunks) => {
+        for (let i = 0; i < chunks.length; i++) {
+          const wordCount = chunks[i].split(/\s+/).length;
+          const result = stmt.run(docId, i, chunks[i], wordCount);
+          chunkIds.push(result.lastInsertRowid);
+        }
+      });
+
+      transaction(chunks);
+      logger.success(`Stored ${chunks.length} chunks for document ${docId}`);
+      return chunkIds;
+    } catch (error) {
+      logger.error('Failed to store chunks', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Store embeddings for chunks
+   */
+  storeEmbeddings(chunkIds, embeddings) {
+    try {
+      const stmt = db.prepare(`
+        INSERT INTO vec_embeddings (chunk_id, embedding)
+        VALUES (?, ?)
+      `);
+
+      const transaction = db.transaction((chunkIds, embeddings) => {
+        for (let i = 0; i < chunkIds.length; i++) {
+          if (embeddings[i]) {
+            // Convert embedding array to JSON string for storage
+            stmt.run(chunkIds[i], JSON.stringify(embeddings[i]));
+          }
+        }
+      });
+
+      transaction(chunkIds, embeddings);
+      logger.success(`Stored ${embeddings.filter(e => e).length} embeddings`);
+    } catch (error) {
+      logger.error('Failed to store embeddings', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  cosineSimilarity(vecA, vecB) {
+    if (vecA.length !== vecB.length) {
+      throw new Error('Vectors must have same length');
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+    }
+
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
+  /**
+   * Search for similar chunks using vector similarity
+   */
+  searchSimilar(queryEmbedding, options = {}) {
+    const {
+      limit = 5,
+      minSimilarity = 0.0
+    } = options;
+
+    try {
+      // Get all embeddings with their chunks and document info
+      const rows = db.prepare(`
+        SELECT 
+          ve.chunk_id,
+          ve.embedding,
+          c.chunk_text,
+          c.chunk_index,
+          c.word_count,
+          c.doc_id,
+          d.original_name,
+          d.file_type,
+          d.upload_date
+        FROM vec_embeddings ve
+        JOIN chunks c ON ve.chunk_id = c.id
+        JOIN documents d ON c.doc_id = d.id
+        WHERE d.status = 'completed'
+      `).all();
+
+      logger.debug(`Searching through ${rows.length} chunks`);
+
+      // Calculate similarity for each chunk
+      const results = rows.map(row => {
+        const embedding = JSON.parse(row.embedding);
+        const similarity = this.cosineSimilarity(queryEmbedding, embedding);
+
+        return {
+          chunkId: row.chunk_id,
+          docId: row.doc_id,
+          filename: row.original_name,
+          text: row.chunk_text,
+          chunkIndex: row.chunk_index,
+          wordCount: row.word_count,
+          similarity: similarity,
+          fileType: row.file_type,
+          uploadDate: row.upload_date
+        };
+      });
+
+      // Filter by minimum similarity and sort
+      const filteredResults = results
+        .filter(r => r.similarity >= minSimilarity)
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, limit);
+
+      logger.success(`Found ${filteredResults.length} similar chunks`);
+      return filteredResults;
+    } catch (error) {
+      logger.error('Failed to search similar chunks', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get chunks for a specific document
+   */
+  getDocumentChunks(docId) {
+    try {
+      const chunks = db.prepare(`
+        SELECT * FROM chunks
+        WHERE doc_id = ?
+        ORDER BY chunk_index ASC
+      `).all(docId);
+
+      return chunks;
+    } catch (error) {
+      logger.error(`Failed to get chunks for document ${docId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete chunks and embeddings for a document
+   */
+  deleteDocumentChunks(docId) {
+    try {
+      // Get chunk IDs to delete embeddings
+      const chunks = this.getDocumentChunks(docId);
+      const chunkIds = chunks.map(c => c.id);
+
+      if (chunkIds.length > 0) {
+        // Delete embeddings
+        const deleteEmbeddings = db.prepare(`
+          DELETE FROM vec_embeddings WHERE chunk_id = ?
+        `);
+
+        db.transaction(() => {
+          for (const chunkId of chunkIds) {
+            deleteEmbeddings.run(chunkId);
+          }
+        })();
+
+        // Delete chunks (will cascade)
+        db.prepare('DELETE FROM chunks WHERE doc_id = ?').run(docId);
+
+        logger.success(`Deleted ${chunkIds.length} chunks for document ${docId}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to delete chunks for document ${docId}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get vector storage statistics
+   */
+  getStats() {
+    try {
+      const stats = db.prepare(`
+        SELECT 
+          COUNT(DISTINCT c.doc_id) as indexed_documents,
+          COUNT(c.id) as total_chunks,
+          COUNT(ve.chunk_id) as total_embeddings,
+          AVG(c.word_count) as avg_chunk_words
+        FROM chunks c
+        LEFT JOIN vec_embeddings ve ON c.id = ve.chunk_id
+      `).get();
+
+      return stats;
+    } catch (error) {
+      logger.error('Failed to get vector store stats', error);
+      throw error;
+    }
+  }
+}
+
+module.exports = new VectorStore();

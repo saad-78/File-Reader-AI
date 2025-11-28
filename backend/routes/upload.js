@@ -1,0 +1,198 @@
+const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const ocrService = require('../services/ocr');
+const storageService = require('../services/storage');
+const logger = require('../utils/logger');
+
+const router = express.Router();
+
+// Configure multer storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = process.env.UPLOAD_DIR || './uploads';
+    
+    // Ensure upload directory exists
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+  }
+});
+
+// File filter - UPDATED TO ALLOW TEXT FILES FOR DEMO
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'text/plain'  // Added for demo/testing
+  ];
+
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`File type ${file.mimetype} not allowed. Allowed types: PDF, JPG, PNG, TXT`), false);
+  }
+};
+
+// Configure multer
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 52428800 // 50MB default
+  },
+  fileFilter: fileFilter
+});
+
+/**
+ * POST /api/upload
+ * Upload a single document
+ */
+router.post('/', upload.single('document'), async (req, res) => {
+  try {
+    // Check if file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded. Please provide a file in the "document" field.'
+      });
+    }
+
+    logger.info(`File uploaded: ${req.file.originalname} (${req.file.size} bytes)`);
+
+    // Create document record in database
+    const docId = storageService.createDocument({
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      filePath: req.file.path,
+      mimeType: req.file.mimetype,
+      size: req.file.size
+    });
+
+    // Return immediate response
+    res.status(202).json({
+      success: true,
+      message: 'Document uploaded successfully and queued for processing',
+      data: {
+        documentId: docId,
+        filename: req.file.originalname,
+        size: req.file.size,
+        status: 'processing'
+      }
+    });
+
+    // Process document asynchronously
+    setImmediate(async () => {
+      try {
+        logger.info(`Starting background processing for document ${docId}`);
+        
+        // Update status to processing
+        storageService.updateDocumentStatus(docId, 'processing');
+
+        // Extract text using OCR
+        const extractedData = await ocrService.extractText(
+          req.file.path,
+          req.file.mimetype
+        );
+
+        // Update document with extracted text
+        storageService.updateDocumentText(docId, extractedData);
+
+        logger.success(`Document ${docId} processed successfully via ${extractedData.method}`);
+      } catch (error) {
+        logger.error(`Failed to process document ${docId}`, error);
+        storageService.markDocumentFailed(docId, error.message);
+      }
+    });
+
+  } catch (error) {
+    logger.error('Upload route error', error);
+    
+    // Clean up uploaded file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to upload document'
+    });
+  }
+});
+
+/**
+ * POST /api/upload/batch
+ * Upload multiple documents
+ */
+router.post('/batch', upload.array('documents', 10), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No files uploaded'
+      });
+    }
+
+    logger.info(`Batch upload: ${req.files.length} files`);
+
+    const uploadedDocs = [];
+
+    for (const file of req.files) {
+      try {
+        const docId = storageService.createDocument({
+          filename: file.filename,
+          originalName: file.originalname,
+          filePath: file.path,
+          mimeType: file.mimetype,
+          size: file.size
+        });
+
+        uploadedDocs.push({
+          documentId: docId,
+          filename: file.originalname,
+          status: 'processing'
+        });
+
+        // Process each document asynchronously
+        setImmediate(async () => {
+          try {
+            storageService.updateDocumentStatus(docId, 'processing');
+            const extractedData = await ocrService.extractText(file.path, file.mimetype);
+            storageService.updateDocumentText(docId, extractedData);
+            logger.success(`Batch document ${docId} processed`);
+          } catch (error) {
+            logger.error(`Batch processing failed for ${docId}`, error);
+            storageService.markDocumentFailed(docId, error.message);
+          }
+        });
+      } catch (error) {
+        logger.error(`Failed to process file ${file.originalname}`, error);
+      }
+    }
+
+    res.status(202).json({
+      success: true,
+      message: `${uploadedDocs.length} documents uploaded and queued for processing`,
+      data: uploadedDocs
+    });
+
+  } catch (error) {
+    logger.error('Batch upload error', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+module.exports = router;
